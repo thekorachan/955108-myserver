@@ -6,11 +6,16 @@ on:
       - main
 
 jobs:
-  print-text:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: Print text from dist/index.js
-        run: cat dist/index.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Run Test1
+        run: node dist/test1.js
