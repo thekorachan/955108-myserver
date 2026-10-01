@@ -1,4 +1,4 @@
-name: Print Text from dist/index.js
+name: Workflow 1
 
 on:
   push:
