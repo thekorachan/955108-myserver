@@ -1,0 +1,16 @@
+name: Print Text from dist/index.js
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  print-text:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Print text from dist/index.js
+        run: cat dist/index.js
