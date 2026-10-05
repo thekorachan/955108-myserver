@@ -1,7 +1,11 @@
 *
 !dist/
 !dist/**/*
+!dist/Util.ts
+!dist/test1.ts
 !.gitignore
 !.github/
 !.github/workflows/
 !.github/workflows/*.yml
+.env
+.env.*

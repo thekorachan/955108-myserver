@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Users</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f5f6f8; color: #26313b; font: 16px/1.5 system-ui, sans-serif; }
+    main { max-width: 1000px; margin: 48px auto; padding: 0 24px; }
+    h1 { margin-bottom: 4px; font-size: 30px; }
+    h2 { margin: 0 0 20px; font-size: 20px; }
+    .intro { color: #63707b; margin: 0 0 28px; }
+    .layout { display: grid; grid-template-columns: 300px 1fr; gap: 24px; align-items: start; }
+    section { background: white; padding: 24px; border: 1px solid #dde2e7; border-radius: 8px; }
+    label { display: block; margin-bottom: 16px; font-size: 14px; font-weight: 600; }
+    input { display: block; width: 100%; margin-top: 6px; padding: 10px; border: 1px solid #b8c2cc; border-radius: 4px; font: inherit; }
+    button { padding: 10px 16px; border: 1px solid #315b79; border-radius: 4px; background: #315b79; color: white; cursor: pointer; font: inherit; }
+    button:disabled { opacity: .6; cursor: wait; }
+    :focus-visible { outline: 3px solid #8eb5d4; outline-offset: 3px; }
+    .heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    .heading h2 { margin: 0; }
+    .heading button { background: white; color: #315b79; font-size: 14px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th, td { padding: 12px 8px; border-bottom: 1px solid #e5e9ed; overflow-wrap: anywhere; }
+    th { font-size: 13px; color: #63707b; }
+    #status, #list-status { font-size: 14px; }
+    #status:empty, #list-status:empty { display: none; }
+    .actions { display: flex; gap: 8px; }
+    .actions button { padding: 6px 10px; font-size: 14px; }
+    .delete { background: white; color: #a12c2c; border-color: #a12c2c; }
+    #cancel { background: white; color: #315b79; }
+    .error { color: #a12c2c; }
+    @media (max-width: 720px) { main { margin: 24px auto; padding: 0 16px; } .layout { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Users</h1>
+    <p class="intro">Add, edit, and delete users.</p>
+    <div class="layout">
+      <section aria-labelledby="add-title">
+        <h2 id="add-title">Add user</h2>
+        <form id="user-form">
+          <label>Username<input name="username" required autocomplete="username"></label>
+          <label>Email<input name="email" type="email" required autocomplete="email"></label>
+          <label>Password<input name="password" type="password" required autocomplete="new-password"></label>
+          <label>Age<input name="age" type="number" min="0" step="1" required></label>
+          <button id="save" type="submit">Add user</button>
+          <button id="cancel" type="button" hidden>Cancel</button>
+          <p id="status" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+      <section aria-labelledby="list-title">
+        <div class="heading"><h2 id="list-title">Saved users</h2><button id="refresh" type="button">Refresh</button></div>
+        <p id="list-status" role="status" aria-live="polite"></p>
+        <div class="table-wrap">
+          <table><thead><tr><th scope="col">Username</th><th scope="col">Email</th><th scope="col">Age</th><th scope="col">Actions</th></tr></thead><tbody id="users"></tbody></table>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script>
+    const form = document.querySelector('#user-form');
+    const save = document.querySelector('#save');
+    const refresh = document.querySelector('#refresh');
+    const status = document.querySelector('#status');
+    const listStatus = document.querySelector('#list-status');
+    const rows = document.querySelector('#users');
+
+    const cancel = document.querySelector('#cancel');
+    const title = document.querySelector('#add-title');
+    let editingId = null;
+
+    function resetForm() {
+      form.reset();
+      editingId = null;
+      title.textContent = 'Add user';
+      save.textContent = 'Add user';
+      cancel.hidden = true;
+      form.elements.password.required = true;
+      form.elements.password.placeholder = '';
+    }
+
+    function editUser(user) {
+      if (save.disabled) return;
+      editingId = user._id;
+      for (const field of ['username', 'email', 'age']) form.elements[field].value = user[field];
+      form.elements.password.value = '';
+      form.elements.password.required = false;
+      form.elements.password.placeholder = 'Leave blank to keep password';
+      title.textContent = 'Edit user';
+      save.textContent = 'Save changes';
+      cancel.hidden = false;
+      status.textContent = '';
+      form.elements.username.focus();
+    }
+
+    async function deleteUser(user, button) {
+      if (save.disabled || !confirm('Delete user "' + user.username + '"? This cannot be undone.')) return;
+      button.disabled = true;
+      try {
+        await request({ method: 'DELETE' }, '/' + encodeURIComponent(user._id));
+        if (editingId === user._id) resetForm();
+        status.className = '';
+        status.textContent = 'User deleted successfully.';
+        await loadUsers();
+      } catch (error) {
+        status.className = 'error';
+        status.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function request(options, path = '') {
+      const response = await fetch('/api/users' + path, options);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Request failed. Please try again.');
+      return data;
+    }
+
+    async function loadUsers() {
+      refresh.disabled = true;
+      listStatus.className = '';
+      listStatus.textContent = 'Loading users…';
+      try {
+        const users = await request();
+        rows.replaceChildren();
+        for (const user of users) {
+          const row = document.createElement('tr');
+          for (const value of [user.username, user.email, user.age]) {
+            const cell = document.createElement('td');
+            cell.textContent = value;
+            row.append(cell);
+          }
+          const actions = document.createElement('td');
+          const buttons = document.createElement('div');
+          buttons.className = 'actions';
+          for (const action of ['Edit', 'Delete']) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = action;
+            button.setAttribute('aria-label', action + ' ' + user.username);
+            if (action === 'Delete') button.className = 'delete';
+            button.addEventListener('click', () => action === 'Edit' ? editUser(user) : deleteUser(user, button));
+            buttons.append(button);
+          }
+          actions.append(buttons);
+          row.append(actions);
+          rows.append(row);
+        }
+        listStatus.textContent = users.length ? '' : 'No users yet. Add the first user using the form.';
+      } catch (error) {
+        listStatus.className = 'error';
+        listStatus.textContent = 'Could not refresh the list. ' + error.message;
+      } finally {
+        refresh.disabled = false;
+      }
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      save.disabled = true;
+      status.className = '';
+      status.textContent = 'Saving…';
+      const data = Object.fromEntries(new FormData(form));
+      data.age = Number(data.age);
+      if (editingId && !data.password) delete data.password;
+      try {
+        await request({ method: editingId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }, editingId ? '/' + encodeURIComponent(editingId) : '');
+        resetForm();
+        status.textContent = 'User saved successfully.';
+        await loadUsers();
+      } catch (error) {
+        status.className = 'error';
+        status.textContent = error.message;
+      } finally {
+        save.disabled = false;
+      }
+    });
+    cancel.addEventListener('click', () => { if (!save.disabled) { resetForm(); status.textContent = ''; } });
+    refresh.addEventListener('click', loadUsers);
+    loadUsers();
+  </script>
+</body>
+</html>
