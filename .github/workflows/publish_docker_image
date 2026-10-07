@@ -36,7 +36,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: thekora/test2:latest
+          images: thekora/test2
 
       - name: Build and push Docker image
         id: push
