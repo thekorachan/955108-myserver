@@ -10,8 +10,9 @@
 name: Publish Docker image
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - '*.*.*'
 
 jobs:
   push_to_registry:
@@ -51,6 +52,6 @@ jobs:
       - name: Generate artifact attestation
         uses: actions/attest@v4
         with:
-          subject-name: index.docker.io/my-docker-hub-namespace/my-docker-hub-repository
+          subject-name: index.docker.io/${{ secrets.DOCKER_USERNAME }}/test2
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
